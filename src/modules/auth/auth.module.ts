@@ -6,7 +6,7 @@ import UsersRepository from "src/infrastructure/postgres/repositories/users.repo
 import AuthController from "src/modules/auth/auth.controller";
 
 @Module({
-    providers: [AuthService, UsersRepository, UserRoleRepository, LoggerService],
+    providers: [AuthService, UsersRepository, UserRoleRepository],
     controllers: [AuthController],
 })
 

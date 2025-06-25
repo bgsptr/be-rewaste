@@ -32,6 +32,17 @@ class AuthController {
             refreshToken
         }
     }
+
+    @Post('register')
+    async createAccountController(@Body() data: AuthDto) {
+        const result = await this.authService.createAccount(data);
+
+        return {
+            success: true,
+            message: "successfully create new account",
+            result,
+        }
+    }
 }
 
 export default AuthController;

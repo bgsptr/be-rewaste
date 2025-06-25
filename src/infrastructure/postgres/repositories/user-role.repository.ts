@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { UserRoles } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import PrismaService from "src/core/services/prisma/prisma.service";
 
 @Injectable()
@@ -8,12 +8,12 @@ class UserRoleRepository {
         private prisma: PrismaService
     ) {}
 
-    async fetchAll(): Promise<UserRoles[]> {
-        return await this.prisma.userRoles.findMany();
+    async fetchAll(): Promise<UserRole[]> {
+        return await this.prisma.userRole.findMany();
     }
 
     async addRole(userId: string, roleId: string) {
-        await this.prisma.userRoles.create({
+        await this.prisma.userRole.create({
             data: {
                 userId,
                 roleId
@@ -22,7 +22,7 @@ class UserRoleRepository {
     }
 
     async getRoles(userId: string) {
-        return await this.prisma.userRoles.findMany({
+        return await this.prisma.userRole.findMany({
             where: {
                 userId,
             },

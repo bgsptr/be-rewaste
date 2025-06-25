@@ -8,11 +8,14 @@ import { roleNumber } from "src/utils/enum/role.enum";
 import AuthDto from "src/application/dto/auth.dto";
 import { LoggerService } from "src/infrastructure/logger/logger.service";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { generateIdWithNano } from "src/utils/generator";
+import { CustomConflict } from "src/core/exceptions/custom-conflict.exception";
+import { NotFoundException } from "src/core/exceptions/not-found.exception";
 
 interface PayloadJWT {
     userId: string,
     roleString: string[],
-    data: {
+    data?: {
         transporterId?: string | null,
         villageId: string | null,
     }
@@ -26,9 +29,13 @@ export class AuthService {
         private logger: LoggerService,
     ) { }
 
-    async authenticateAccount({ email: emailDto, password: passwordDto }: AuthDto) {
+    async authenticateAccount({ username: usernameDto, password: passwordDto }: AuthDto) {
         try {
-            const { userId, email, password, phoneNumber, villageId, transporterId } = await this.userRepository.getAccountCredentialWithEmail(emailDto);
+            const result = await this.userRepository.getAccountByUsername(usernameDto);
+
+            if (!result?.userId) throw new CustomUnauthorized();
+
+            const { userId, password } = result;
 
             const passwordIsMatch = await Hasher.comparePassword(passwordDto, password);
             if (!passwordIsMatch) throw new CustomUnauthorized(`password is not match`);
@@ -39,13 +46,7 @@ export class AuthService {
             const payload: PayloadJWT = {
                 userId,
                 roleString,
-                data: {
-                    transporterId: roleString.includes(roleNumber.TRANSPORTER) && transporterId !== null ? transporterId : undefined,
-                    villageId: roleString.includes(roleNumber.VILLAGE) && villageId ? villageId : null,
-                }
             }
-
-            await this.userRepository.updateLastSeen(userId, new Date());
 
             const accessToken = await this.generateJwtToken(payload, true);
             this.logger.log("token: ", accessToken);
@@ -62,7 +63,24 @@ export class AuthService {
             if (err instanceof PrismaClientKnownRequestError) throw new CustomUnauthorized(`can't find email of user`);
             throw new InternalServerErrorException();
         }
+    }
 
+    async createAccount({ username, password }) {
+        const userId = `USER-${generateIdWithNano()}`;
+
+        try {
+            const result = await this.userRepository.getAccountByUsername(username);
+
+            if (result?.userId) throw new CustomConflict('user');
+            const passwordDto = await Hasher.hashPassword(password);
+            const user = await this.userRepository.create({ userId, username, password: passwordDto });
+            await this.userRoleRepository.addRole(user.userId, roleNumber.VIEWER);
+            return user;
+        } catch (err) {
+            this.logger.error(err);
+            if (err instanceof PrismaClientKnownRequestError) throw new CustomConflict('user');
+            throw err;
+        }
     }
 
     private async generateJwtToken(payload: PayloadJWT, accessToken: boolean) {

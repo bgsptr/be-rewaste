@@ -3,342 +3,97 @@ generator client {
 }
 
 datasource db {
-  provider            = "postgresql"
-  url                 = env("DATABASE_URL")
-  shadowDatabaseUrl   = env("SHADOW_DATABASE_URL")
-}
-
-enum RescheduleStatus {
-  active
-  inactive
-}
-
-enum AccountStatus {
-  active
-  inactive
-  suspended
-}
-
-enum PickupStatus {
-  draft
-  requested
-  scheduled
-  in_progress
-  completed
-  cancelled
-}
-
-enum CarStatus {
-  operate
-  maintenance
-  idle
-}
-
-enum PaymentStatus {
-  paid
-  unpaid
-  late
-}
-
-enum PaymentMethod {
-  bank
-  QRIS
-  WA
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
-  userId                String                          @id
-  fullName              String
-  email                 String                          @unique
-  phoneNumber           String
-  password              String                          @default("warga123")
-  nik                   String
-  simNo                 String?
-  qrCode                String?
-  addressId             String?
-  address               Address?                        @relation(fields: [addressId], references: [addressId])
-  rescheduleStatus      RescheduleStatus                @default(inactive)
-  rescheduleStopAt      DateTime?
-  transporterId         String?
-  transporter           Transporter?                    @relation(fields: [transporterId], references: [id])
-  villageId             String?
-  village               Village?                        @relation("VillageUsers", fields: [villageId], references: [id])
-  wasteFees             String?
-  loyaltyId             String?
-  loyalty               Loyalty?                        @relation(fields: [loyaltyId], references: [loyaltyId])
-  accountStatus         AccountStatus                   @default(active)
-  lastSeen              DateTime?
-  createdAt             DateTime                        @default(now())
-  points                Point?
-  roles                 UserRoles[]
-  trashCitizen          Trash[]                         @relation("CitizenTrash")
-  trashDriver           Trash[]                         @relation("DriverTrash")
-  verification          Verification[]                  @relation("Verificator")
-  driverRatingsGiven    DriverRating[]                  @relation("DriverRatingGiven")
-  driverRatingsReceived DriverRating[]                  @relation("DriverRatingReceived")
-  verificatorBadges     VerificatorVerificationBadges[]
-  citizenRewards        CitizenReward[]
-  car                   Car?
+  userId   String @id
+  username String
+  password String
 
-  verifiedVillages Village?                          @relation("VerificatorVillage")
-  
-  Invoice          Invoice[]
-
-  driverVillageId       String?
-  driverVillage         Village?                     @relation("DriverVillage", fields: [driverVillageId], references: [id])
+  videos    Video[]
+  bookmarks VideoBookmarked[]
+  ratings   VideoRated[]
+  histories VideoHistoryAndView[]
+  comments  VideoComment[]
+  UserRole  UserRole[]
 }
 
 model Role {
-  id    String      @id
-  name  String
-  users UserRoles[]
+  roleId   String     @id
+  name     String
+  UserRole UserRole[]
 }
 
-model Address {
-  addressId   String @id
-  fullAddress String
-  lat         String
-  lng         String
-  users       User[]
-}
-
-model Point {
-  pointId       String @id
-  userId        String @unique
-  user          User   @relation(fields: [userId], references: [userId])
-  lifetimePoint Int
-  remainPoint   Int
-}
-
-model TrashType {
-  id         String              @id
-  name       String
-  trashLinks TrashHasTrashType[]
-}
-
-model Trash {
-  id             String              @id
-  pickupAt       DateTime?
-  createdAt      DateTime
-  pickupRateTime Float?
-  pickupStatus   PickupStatus
-  point          Int?
-  verifyStatus   Boolean
-  userDriverId   String?
-  userDriver     User?                @relation("DriverTrash", fields: [userDriverId], references: [userId])
-  userCitizenId  String
-  userCitizen    User                @relation("CitizenTrash", fields: [userCitizenId], references: [userId])
-  rescheduleNote String?
-  verification   Verification[]
-  trashTypes     TrashHasTrashType[]
-}
-
-model Car {
-  id            String               @id
-  carStatus     CarStatus
-  year          Int
-  merk          String
-  capacity      Int
-  platNo        String
-  transporterId String
-  transporter   Transporter          @relation(fields: [transporterId], references: [id])
-  bbmHistory    BBMHistory[]
-  maintenance   MaintenanceHistory[]
-  driver        User?                @relation(fields: [driverId], references: [userId])
-  driverId      String?              @unique
-}
-
-model Transporter {
-  id                    String               @id
-  name                  String
-  leaderFullname        String
-  emailTransporter      String
-  users                 User[]
-  cars                  Car[]
-  invoices              Invoice[]
-  villages              TransporterVillage[]
-  privateTransporter    PrivateTransporter?   // hubungan 1-1 opsional
-  createdAt             DateTime             @default(now())
-}
-
-model PrivateTransporter {
-  id             String     @id @default(uuid())
-  transporterId  String     @unique
-  documentUrl    String
-  transporter    Transporter @relation(fields: [transporterId], references: [id])
-}
-
-model Invoice {
-  id            String        @id
-  nominal       String
-  paymentStatus PaymentStatus
-  paymentMethod PaymentMethod
-  paidAt        DateTime?
-  deadlineAt    DateTime
-  userId        String
-  user          User          @relation(fields: [userId], references: [userId])
-  villageId     String
-  village       Village       @relation(fields: [villageId], references: [id])
-  transporterId String
-  transporter   Transporter   @relation(fields: [transporterId], references: [id])
-}
-
-model Village {
-  id                 String               @id
-  villageName        String
-  province           String
-  district           String
-  regency            String
-  description        String               @default("desa A merupakan desa penghasil beras merah")
-  status             AccountStatus        @default(active)
-  userVerificatorId  String?              @unique
-  userVerificator    User?                @relation("VerificatorVillage", fields: [userVerificatorId], references: [userId]) // not neccessarily
-  profile            VillageProfile?
-  invoices           Invoice[]
-  users              User[]               @relation("VillageUsers")
-  transporterVillage TransporterVillage[]
-  createdAt          DateTime             @default(now())
-
-  drivers               User[]     @relation("DriverVillage")
-}
-
-model VillageProfile {
-  villageId         String   @id
-  street            String?
-  villageLogo       String?
-  villageEmail      String?
-  villageWebsiteUrl String?
-  officePhone       String?
-  headVillagePhone  String?
-  headVillageName   String?
-
-  village           Village  @relation(fields: [villageId], references: [id])
-}
-
-
-model BBMHistory {
-  id          String @id
-  evidenceUrl String
-  totalLiter  Float
-  createdAt   String
-  kilometerAt Float
-  price       Float
-  carId       String
-  car         Car    @relation(fields: [carId], references: [id])
-}
-
-model MaintenanceHistory {
-  id             String   @id
-  lastMaintainAt DateTime
-  nextMaintainAt DateTime
-  description    String
-  maintainPrice  Float
-  carId          String
-  car            Car      @relation(fields: [carId], references: [id])
-}
-
-model Loyalty {
-  loyaltyId    String           @id
-  name         String
-  minimumPoint Int
-  maximumPoint Int
-  users        User[]
-  benefits     LoyaltyBenefit[]
-}
-
-model LoyaltyBenefit {
-  benefitCode String    @id
-  name        String
-  description String
-  tier      Loyalty @relation(fields: [tierId], references: [loyaltyId])
-  tierId    String
-}
-
-model Verification {
-  id                String  @id
-  createdAt         String
-  verificatorUserId String
-  verificator       User    @relation("Verificator", fields: [verificatorUserId], references: [userId])
-  trashId           String  // @unique
-  trash             Trash   @relation(fields: [trashId], references: [id])
-  verifyRateTime    Float
-  status            Boolean
-}
-
-model VerificationBadge {
-  id               String                          @id
-  badgeName        String
-  badgeDescription String
-  users            VerificatorVerificationBadges[]
-}
-
-model Reward {
-  id          String          @id
-  name        String
-  description String
-  point       Int
-  users       CitizenReward[]
-}
-
-model VerificatorVerificationBadges {
-  userId    String
-  badgeId   String
-  grantedAt DateTime
-  user      User              @relation(fields: [userId], references: [userId])
-  badge     VerificationBadge @relation(fields: [badgeId], references: [id])
-
-  @@id([userId, badgeId])
-}
-
-model TransporterVillage {
-  transporterId String
-  villageId     String
-  transporter   Transporter @relation(fields: [transporterId], references: [id])
-  village       Village     @relation(fields: [villageId], references: [id])
-
-  @@id([transporterId, villageId])
-}
-
-model UserRoles {
+model UserRole {
   userId String
-  roleId String
   user   User   @relation(fields: [userId], references: [userId])
-  role   Role   @relation(fields: [roleId], references: [id])
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [roleId])
 
   @@id([userId, roleId])
 }
 
-model TrashHasTrashType {
-  trashId            String
-  trashTypeId        String
-  weight             Float
-  verificationStatus Boolean
-  imageUrl           String
-  trash              Trash     @relation(fields: [trashId], references: [id])
-  trashType          TrashType @relation(fields: [trashTypeId], references: [id])
+model Video {
+  videoId        String   @id
+  title          String
+  thumbnailUrl   String
+  description    String
+  url            String
+  uploaderUserId String
+  createdAt      DateTime
+  updatedAt      DateTime
 
-  @@id([trashId, trashTypeId])
+  uploader  User                  @relation(fields: [uploaderUserId], references: [userId])
+  bookmarks VideoBookmarked[]
+  ratings   VideoRated[]
+  histories VideoHistoryAndView[]
+  comments  VideoComment[]
 }
 
-model CitizenReward {
-  userId        String
-  rewardId      String
-  pointRequired Int
-  name          String
-  description   String
-  user          User   @relation(fields: [userId], references: [userId])
-  reward        Reward @relation(fields: [rewardId], references: [id])
+model VideoBookmarked {
+  userId       String
+  videoId      String
+  bookmarkedAt DateTime
 
-  @@id([userId, rewardId])
+  user  User  @relation(fields: [userId], references: [userId])
+  video Video @relation(fields: [videoId], references: [videoId])
+
+  @@id([userId, videoId])
 }
 
-model DriverRating {
-  userDriverId  String
-  userCitizenId String
-  ratingScore   Int
-  createdAt     DateTime
-  driver        User        @relation("DriverRatingReceived", fields: [userDriverId], references: [userId])
-  citizen       User        @relation("DriverRatingGiven", fields: [userCitizenId], references: [userId])
+model VideoRated {
+  userId    String
+  videoId   String
+  score     Float
+  createdAt DateTime
 
-  @@id([userDriverId, userCitizenId])
+  user  User  @relation(fields: [userId], references: [userId])
+  video Video @relation(fields: [videoId], references: [videoId])
+
+  @@id([userId, videoId])
+}
+
+model VideoHistoryAndView {
+  historyId String   @id
+  userId    String
+  videoId   String
+  viewedAt  DateTime
+
+  user  User  @relation(fields: [userId], references: [userId])
+  video Video @relation(fields: [videoId], references: [videoId])
+}
+
+model VideoComment {
+  commentId String   @id
+  userId    String
+  videoId   String
+  content   String
+  createdAt DateTime
+  updatedAt DateTime
+
+  user  User  @relation(fields: [userId], references: [userId])
+  video Video @relation(fields: [videoId], references: [videoId])
 }
